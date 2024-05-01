@@ -1,16 +1,16 @@
 import streamlit as st
+import pandas as pd
 
-import streamlit as st
+st.title('st.file_uploader')
 
-# Everything is accessible via the st.secrets dict:
+st.subheader('Input CSV')
+uploaded_file = st.file_uploader("Choose a file")
 
-st.write("DB username:", st.secrets["db_username"])
-st.write("DB password:", st.secrets["db_password"])
-st.write("My cool secrets:", st.secrets["my_cool_secrets"]["things_i_like"])
-
-# And the root-level secrets are also accessible as environment variables:
-
-import os
-st.write(
-	"Has environment variables been set:",
-	os.environ["db_username"] == st.secrets["db_username"])
+if uploaded_file is not None:
+  df = pd.read_csv(uploaded_file)
+  st.subheader('DataFrame')
+  st.write(df)
+  st.subheader('Descriptive Statistics')
+  st.write(df.describe())
+else:
+  st.info('?? Upload a CSV file')

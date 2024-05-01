@@ -1,30 +1,70 @@
 import streamlit as st
-import requests
+from streamlit_shap import st_shap
+import shap
+from sklearn.model_selection import train_test_split
+import xgboost
+import numpy as np
+import pandas as pd
 
-st.title('?? Bored API app')
+st.set_page_config(layout="wide")
 
-st.sidebar.header('Input')
-selected_type = st.sidebar.selectbox('Select an activity type', ["education", "recreational", "social", "diy", "charity", "cooking", "relaxation", "music", "busywork"])
+@st.experimental_memo
+def load_data():
+    return shap.datasets.adult()
 
-suggested_activity_url = f'http://www.boredapi.com/api/activity?type={selected_type}'
-json_data = requests.get(suggested_activity_url)
-suggested_activity = json_data.json()
+@st.experimental_memo
+def load_model(X, y):
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=7)
+    d_train = xgboost.DMatrix(X_train, label=y_train)
+    d_test = xgboost.DMatrix(X_test, label=y_test)
+    params = {
+        "eta": 0.01,
+        "objective": "binary:logistic",
+        "subsample": 0.5,
+        "base_score": np.mean(y_train),
+        "eval_metric": "logloss",
+        "n_jobs": -1,
+    }
+    model = xgboost.train(params, d_train, 10, evals = [(d_test, "test")], verbose_eval=100, early_stopping_rounds=20)
+    return model
 
-c1, c2 = st.columns(2)
-with c1:
-  with st.expander('About this app'):
-    st.write('Are you bored? The **Bored API app** provides suggestions on activities that you can do when you are bored. This app is powered by the Bored API.')
-with c2:
-  with st.expander('JSON data'):
-    st.write(suggested_activity)
+st.title("`streamlit-shap` for displaying SHAP plots in a Streamlit app")
 
-st.header('Suggested activity')
-st.info(suggested_activity['activity'])
+with st.expander('About the app'):
+    st.markdown('''[`streamlit-shap`](https://github.com/snehankekre/streamlit-shap) is a Streamlit component that provides a wrapper to display [SHAP](https://github.com/slundberg/shap) plots in [Streamlit](https://streamlit.io/). 
+                    The library is developed by our in-house staff [Snehan Kekre](https://github.com/snehankekre) who also maintains the [Streamlit Documentation](https://docs.streamlit.io/) website.
+                ''')
 
-col1, col2, col3 = st.columns(3)
-with col1:
-  st.metric(label='Number of Participants', value=suggested_activity['participants'], delta='')
-with col2:
-  st.metric(label='Type of Activity', value=suggested_activity['type'].capitalize(), delta='')
-with col3:
-  st.metric(label='Price', value=suggested_activity['price'], delta='')
+st.header('Input data')
+X,y = load_data()
+X_display,y_display = shap.datasets.adult(display=True)
+
+with st.expander('About the data'):
+    st.write('Adult census data is used as the example dataset.')
+with st.expander('X'):
+    st.dataframe(X)
+with st.expander('y'):
+    st.dataframe(y)
+
+st.header('SHAP output')
+
+# XGBoostモデルをトレーニングします
+model = load_model(X, y)
+
+# SHAP値を計算します
+explainer = shap.Explainer(model, X)
+shap_values = explainer(X)
+
+with st.expander('Waterfall plot'):
+    st_shap(shap.plots.waterfall(shap_values[0]), height=300)
+with st.expander('Beeswarm plot'):
+    st_shap(shap.plots.beeswarm(shap_values), height=300)
+
+explainer = shap.TreeExplainer(model)
+shap_values = explainer.shap_values(X)
+
+with st.expander('Force plot'):
+    st.subheader('First data instance')
+    st_shap(shap.force_plot(explainer.expected_value, shap_values[0,:], X_display.iloc[0,:]), height=200, width=1000)
+    st.subheader('First thousand data instance')
+    st_shap(shap.force_plot(explainer.expected_value, shap_values[:1000,:], X_display.iloc[:1000,:]), height=400, width=1000)

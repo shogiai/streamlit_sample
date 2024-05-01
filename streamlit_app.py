@@ -1,16 +1,15 @@
 import streamlit as st
-import pandas as pd
+import time
 
-st.title('st.file_uploader')
+st.title('st.progress')
 
-st.subheader('Input CSV')
-uploaded_file = st.file_uploader("Choose a file")
+with st.expander('About this app'):
+     st.write('You can now display the progress of your calculations in a Streamlit app with the `st.progress` command.')
 
-if uploaded_file is not None:
-  df = pd.read_csv(uploaded_file)
-  st.subheader('DataFrame')
-  st.write(df)
-  st.subheader('Descriptive Statistics')
-  st.write(df.describe())
-else:
-  st.info('?? Upload a CSV file')
+my_bar = st.progress(0)
+
+for percent_complete in range(100):
+     time.sleep(0.05)
+     my_bar.progress(percent_complete + 1)
+
+st.balloons()
